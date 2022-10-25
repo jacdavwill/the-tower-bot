@@ -6,128 +6,81 @@ from time import sleep, time
 mouse = Controller()
 playing = True
 
+# state
+state = "BATTLING"  # BATTLING, VIEWING_AD
+
 # times
-continue_time = 0
-elevator_time = 0
-stock_time = time()
+ad_start_time = 0
 
-# intervals (sec)
-CONTINUE_INT = 30
-ELEVATOR_INT = 10
-STOCK_INT = 60 * 1 # 1 minutes
+# intervals (seconds)
+ad_int = 30
 
-# screen position
-screen_pos = "UNKNOWN"
+# img pts
+gem_5_button = [
+    ((760, 496), (255, 255, 255)),
+    ((745, 479), (255, 255, 255)),
+    ((781, 515), (255, 255, 255))
+]
 
 
 def on_press(key):
-    a=1
+    a = 1  # This is a no-op
+
 
 def on_release(key):
     global playing
     if key == keyboard.Key.space:
         playing = False
 
+
 def click(pos):
     mouse.position = pos
     mouse.click(button=Button.left)
     sleep(.5)
 
-def go_to_bottom():
-    global screen_pos
-    if screen_pos != "BOTTOM":
-        screen_pos = "BOTTOM"
-        click((340,890))
-        sleep(1)
-
-def go_to_top():
-    global screen_pos
-    if screen_pos != "TOP":
-        screen_pos = "TOP"
-        click((24, 53))
-        sleep(1)
 
 def is_close_to(target, sample, tolerance):
     return abs(target[0]-sample[0]) < tolerance and abs(target[1] - sample[1]) < tolerance and abs(target[2] - sample[2]) < tolerance
 
-def avg_color(colors):
-    x, y, z = 0, 0, 0
-    for color in colors:
-        x += color[0]
-        y += color[1]
-        z += color[2]
-    return x / len(colors), y / len(colors), z / len(colors)
 
 def get_pix_color(pos):
     mouse.position = pos
     return pyautogui.pixel(*pos)
 
-def check_continue(button="cont"):
-    # print("checking continue")
-    global continue_time
-    continue_time = time()
-    REGION = (69, 309, 347, 323) # left, top, width, height
-    try:
-        path = "./assets/continue_button.png"
-        if button == "yes":
-            path = "assets/yes_button.png"
-        pos = pyautogui.locateCenterOnScreen(path, region=REGION)
-        click(pos)
-        continue_time = time()
-        # print("clicked continue")
-        return True
-    except:
-        return False
 
-def check_elevator():
-    print("checking elevator")
-    pass
+def check_5G():
+    global state, ad_start_time
+    print("checking 5 gem")
+    for pt in gem_5_button:
+        if not is_close_to(pt[1], get_pix_color(pt[0]), 10):
+            return False
 
-def check_stock():
-    # print("checking stock")
-    global stock_time
-    stock_time = time()
-    STOCK_ALL_POS = (217, 766)
-    STOCK_ALL_COLOR = (0, 143, 208)
-    go_to_bottom()
-    mouse.position = STOCK_ALL_POS
-    if is_close_to(get_pix_color(STOCK_ALL_POS), STOCK_ALL_COLOR, tolerance=20):
-        # print("restocking")
-        click(STOCK_ALL_POS)
-        if check_continue(button="yes"):
-            print(time(), "RE-STOCK")
-        sleep(.25)
-        check_continue() # to catch full stock bonus msg
+    print("found 5 gem")
+    click(gem_5_button[0][0])
+    state = "VIEWING_AD"
+    ad_start_time = time()
 
-def check_parachute():
-    # print("checking parachute")
-    PARACHUTE_POS = (245, 107)
-    SKY_POS = [(420,105),(455,191),(103,72),(104,230)]
-    TOLERANCE = 10
-    go_to_top()
-    sky_color = avg_color([get_pix_color(pos) for pos in SKY_POS])
-    pixel_color = get_pix_color(PARACHUTE_POS)
-    if not is_close_to(pixel_color, sky_color, TOLERANCE):
-        click(PARACHUTE_POS)
-        if check_continue():
-            print(time(), "CATCH PARACHUTE")
+
+def check_ad_finished():
+    global state
+    print("checking ad finished")
+
 
 def play():
-    global continue_time, stock_time
+    global state, ad_start_time, ad_int
     listener = keyboard.Listener(
         on_press=on_press,
         on_release=on_release)
     listener.start()
     while playing:
+        sleep(1)
         t = time()
-        sleep(.25)
-        check_parachute()
-        if t - continue_time > CONTINUE_INT:
-            check_continue()
-        # if t - elevator_time > ELEVATOR_INT:
-        #     pass
-        if t - stock_time > STOCK_INT:
-            check_stock()
+        if state == "BATTLING":
+            check_5G()
+        elif state == "VIEWING_AD":
+            if t - ad_start_time > ad_int:
+                check_ad_finished()
         # print('Mouse: {0}, Color: {1}'.format(mouse.position, pyautogui.pixel(*mouse.position)))
+
 
 play()
