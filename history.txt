@@ -1,0 +1,12 @@
+
+
+10/25/22 -------------------------------------------------------------------
+{'gem_5_rewards_claimed': 35, 'gem_2_rewards_claimed': 24, 'start_time': 1666768608.6571615, 'start_coins': 281.46, 'start_gems': 369}
+Total run time:  24923.924309015274  seconds
+Total gems collected:  223
+Gems/hr:  32.2100159688584
+
+Coin gain: ~1.1M
+
+t6, no sprint, restart every 60s
+----------------------------------------------------------------------------
