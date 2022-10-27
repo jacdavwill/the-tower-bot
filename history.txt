@@ -7,6 +7,8 @@ Total gems collected:  223
 Gems/hr:  32.2100159688584
 
 Coin gain: ~1.1M
+5 gem time: 11.28 mins
+2 gem time: 3.5/hr
 
 t6, no sprint, restart every 60s
 ----------------------------------------------------------------------------

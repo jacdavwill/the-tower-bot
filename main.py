@@ -22,22 +22,23 @@ summary = {
     "gem_5_rewards_claimed": 0,
     "gem_2_rewards_claimed": 0,
     "start_time": time(),
-    "start_coins": 281.46,
-    "start_gems": 369
+    "start_coins": "1.35M",
+    "start_gems": 619
 }
 
 # Times
-ad_start_time = 0
+ad_start_time = time()
 gem_5_start_time = 0
 gem_2_start_time = 0
 round_time = time()
 
 # Intervals (seconds)
-ad_int = 30
+ad_int = 32
+ad_max_timeout_int = 40
 gem_5_int = 10 * 60  # 10 minutes
 gem_2_int = 10 * 60  # 10 minutes
 sprint_t6_int = 37
-restart_int = 60
+restart_int = 45
 
 # Assets
 ASSETS_PREFIX = "./assets/"
@@ -47,15 +48,18 @@ GEM_5_BUTTON = "gem_5_button"
 GEM_5_CLAIM_BUTTON = "gem_5_claim_button"
 GEM_2_BUTTON = "gem_2_button"
 RETRY_BUTTON = "retry_button"
-AD_CLOSE_BUTTONS = [f"ad_close_{x}" for x in range(4)]  # TODO: make this dynamic (grabs asset files with this prefix from the folder)
+AD_CLOSE_BUTTONS = [f"ad_close_{x}" for x in range(5)]  # TODO: make this dynamic (grabs asset files with this prefix from the folder)
+UTILITY_TAB_DISACTIVATED = "utility_tab_disactivated"
+UTILITY_TAB_ACTIVATED = "utility_tab_activated"
+BLUESTACKS_BACK_BUTTON = "bluestacks_back_button"
 
 
-def log(*args):
-    line = ""
-    for item in args:
-        line += str(item) + " "
-    print(line)
-    log_file.write(line + "\n")
+# def log(*args):
+#     line = ""
+#     for item in args:
+#         line += str(item) + " "
+#     print(line)
+#     log_file.write(line + "\n")
 
 
 def on_press(key):
@@ -66,25 +70,31 @@ def on_release(key):
     global current_state, past_state
     if key == keyboard.Key.ctrl_r:
         if current_state == State.PAUSED:
-            log("Un-pausing game!")
-            current_state = past_state
+            print("Un-pausing game!")
+            change_state(past_state)
         else:
-            log("Pausing game!")
-            past_state = current_state
-            current_state = State.PAUSED
+            print("Pausing game!")
+            change_state(State.PAUSED)
     elif key == keyboard.Key.alt_gr:
-        log("Quitting!")
-        current_state = State.QUITTING
+        print("Quitting!")
+        change_state(State.QUITTING)
     elif key == keyboard.Key.shift_r or key == keyboard.Key.shift_l:
         total_time = time() - summary["start_time"]
-        log("\nPrinting run summary")
-        log("----------------------------------------------------------------------------")
-        log(summary)
-        log("Total run time: ", total_time, " seconds")
+        print("\nPrinting run summary")
+        print("----------------------------------------------------------------------------")
+        print(summary)
+        print("Total run time: ", total_time, " seconds")
         total_gems = 5 * summary["gem_5_rewards_claimed"] + 2 * summary["gem_2_rewards_claimed"]
-        log("Total gems collected: ", total_gems)
-        log("Gems/hr: ", total_gems / (total_time / 3600))
-        log("----------------------------------------------------------------------------")
+        print("Total gems collected: ", total_gems)
+        print("Gems/hr: ", total_gems / (total_time / 3600))
+        print("----------------------------------------------------------------------------")
+
+
+def change_state(new_state):
+    global current_state, past_state
+    print("State: ", new_state)
+    past_state = current_state
+    current_state = new_state
 
 
 def click(pos):
@@ -102,35 +112,35 @@ def find_img(img_file_name, confidence=None):
 
 def check_gem_5():
     global current_state, ad_start_time
-    # log("checking gem 5")
+    # print("checking gem 5")
     pos = find_img(GEM_5_BUTTON)
     if pos is not None:
-        log("found 5 gem, starting ad: ", (time() - gem_5_start_time) / 60, " minutes")
+        print("found 5 gem, starting ad: ", (time() - gem_5_start_time) / 60, " minutes")
         click(pos)
-        current_state = State.VIEWING_AD
+        change_state(State.VIEWING_AD)
         ad_start_time = time()
 
 
 def check_ad_finished():
     global current_state
-    log("checking ad finished")
+    # print("checking ad finished")
     for img in AD_CLOSE_BUTTONS:
         pos = find_img(img)
         if pos is not None:
-            log("found ad finished, closing ad")
+            print("found ad finished, closing ad")
             click(pos)
 
 
 def check_ad_closed():
     global current_state, summary, gem_5_start_time
-    log("checking ad closed")
+    # print("checking ad closed")
     pos = find_img(GEM_5_CLAIM_BUTTON)
     if pos is not None:
-        log("found 5 gem claim, claiming reward")
+        print("found 5 gem claim, ad closed: ", time() - ad_start_time)
         summary["gem_5_rewards_claimed"] += 1
         gem_5_start_time = time()
         click(pos)
-        current_state = State.BATTLING
+        change_state(State.BATTLING)
         return True
     else:
         return False
@@ -138,10 +148,10 @@ def check_ad_closed():
 
 def check_gem_2():
     global gem_2_start_time
-    # log("checking gem 2")
+    # print("checking gem 2")
     pos = find_img(GEM_2_BUTTON, 0.7)
     if pos is not None:
-        log("found 2 gem: ", (time() - gem_2_start_time) / 60, " minutes")
+        print("found 2 gem: ", (time() - gem_2_start_time) / 60, " minutes")
         summary["gem_2_rewards_claimed"] += 1
         gem_2_start_time = time()
         click(pos)
@@ -149,13 +159,36 @@ def check_gem_2():
 
 def check_game_over():
     global current_state, round_time
-    log("checking game over")
+    # print("checking game over")
     pos = find_img(RETRY_BUTTON)
     if pos is not None:
-        log("found game over, retrying")
+        print("found game over, restarting")
         round_time = time()
         click(pos)
-        current_state = State.BATTLING
+        change_state(State.BATTLING)
+
+
+def play_round():
+    print("playing round")
+    pos = find_img(UTILITY_TAB_ACTIVATED)
+    if pos is None:
+        print("activating utility tab")
+        dPos = find_img(UTILITY_TAB_ACTIVATED)
+        if dPos is not None:
+            click(pos)
+            sleep(1)
+        else:
+            print("uh-oh, bad state")
+            return False
+
+
+def reset_game():
+    global ad_start_time
+    print("resetting game. Current state: ", current_state)
+    pos = find_img(BLUESTACKS_BACK_BUTTON)
+    if pos is not None:
+        click(pos)
+        sleep(2)
 
 
 def play():
@@ -164,10 +197,10 @@ def play():
         on_press=on_press,
         on_release=on_release)
     listener.start()
-    log("Starting in state: ", current_state)
+    print("Starting in state: ", current_state)
     while current_state is not State.QUITTING:
         # sleep(1)
-        # log('Mouse: {0}, Color: {1}'.format(mouse.position, pyautogui.pixel(*mouse.position)))
+        # print('Mouse: {0}, Color: {1}'.format(mouse.position, pyautogui.pixel(*mouse.position)))
         if current_state is not State.PAUSED:
             t = time()
             if current_state is State.BATTLING:
@@ -178,12 +211,15 @@ def play():
                 if t - gem_5_start_time > gem_5_int:
                     check_gem_5()
             elif current_state is State.VIEWING_AD:
+                # print("viewing add time: ", t - ad_start_time)
+                if t - ad_start_time > ad_max_timeout_int:
+                    reset_game()
                 if t - ad_start_time > ad_int:
                     if not check_ad_closed():
                         check_ad_finished()
 
 
-# current_state = State.VIEWING_AD
+# change_state(State.VIEWING_AD)
 play()
 log_file.close()
 
