@@ -1,4 +1,15 @@
+10/27/22 -------------------------------------------------------------------
+{'gem_5_rewards_claimed': 42, 'gem_2_rewards_claimed': 35, 'start_time': 1666881667.2169273, 'start_coins': '187.20K', 'start_gems': 1008}
+Total run time:  29333.380137443542  seconds
+Total gems collected:  280
+Gems/hr:  34.36358153328896
 
+Coin gain: ~1.6M
+5 gem time: 11.6 mins
+2 gem time: 14.0 mins (25% gems)
+
+t6, sprint, restart after death (around wave 30)
+----------------------------------------------------------------------------
 
 10/25/22 -------------------------------------------------------------------
 {'gem_5_rewards_claimed': 35, 'gem_2_rewards_claimed': 24, 'start_time': 1666768608.6571615, 'start_coins': 281.46, 'start_gems': 369}
@@ -7,8 +18,8 @@ Total gems collected:  223
 Gems/hr:  32.2100159688584
 
 Coin gain: ~1.1M
-5 gem time: 11.28 mins
-2 gem time: 3.5/hr
+5 gem time: 11.9 mins
+2 gem time: 17.3 mins (22% gems)
 
 t6, no sprint, restart every 60s
 ----------------------------------------------------------------------------

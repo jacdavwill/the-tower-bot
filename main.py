@@ -4,6 +4,7 @@ import pyautogui
 import enum
 from time import sleep, time
 import datetime
+from random import random
 
 
 class State(enum.Enum):
@@ -14,17 +15,27 @@ class State(enum.Enum):
     VIEWING_AD = 11
 
 
+class Tab(enum.Enum):
+    ATTACK = 1
+    DEFENSE = 2
+    UTILITY = 3
+    ULTIMATE_WEAPON = 4
+    UNKNOWN = 5
+
+
 mouse = Controller()
 current_state = State.BATTLING
 past_state = State.BATTLING
-log_file = open(f'./logs/{datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")}.txt', 'w')
+# log_file = open(f'./logs/{datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")}.txt', 'w')
 summary = {
     "gem_5_rewards_claimed": 0,
     "gem_2_rewards_claimed": 0,
     "start_time": time(),
-    "start_coins": "1.35M",
-    "start_gems": 619
+    "start_coins": "187.20K",
+    "start_gems": 1008,
+    "restarts": 0
 }
+GAME_SCREEN_REGION = (661, 41, 559, 988)  # left, top, width, height
 
 # Times
 ad_start_time = time()
@@ -33,12 +44,12 @@ gem_2_start_time = 0
 round_time = time()
 
 # Intervals (seconds)
-ad_int = 32
-ad_max_timeout_int = 40
+ad_int = 35
+ad_max_timeout_int = 37
 gem_5_int = 10 * 60  # 10 minutes
-gem_2_int = 10 * 60  # 10 minutes
+gem_2_int = 15 * 60  # 15 minutes
 sprint_t6_int = 37
-restart_int = 45
+restart_int = 30
 
 # Assets
 ASSETS_PREFIX = "./assets/"
@@ -46,20 +57,19 @@ ASSETS_FILE_TYPE = ".png"
 
 GEM_5_BUTTON = "gem_5_button"
 GEM_5_CLAIM_BUTTON = "gem_5_claim_button"
-GEM_2_BUTTON = "gem_2_button"
+CLAIM_REWARD_BUTTON = "claim_reward_button"
+GEM_2_BUTTONS = [f"gem_2_button_{x}" for x in range(4)]
 RETRY_BUTTON = "retry_button"
-AD_CLOSE_BUTTONS = [f"ad_close_{x}" for x in range(5)]  # TODO: make this dynamic (grabs asset files with this prefix from the folder)
+# AD_CLOSE_BUTTONS = [f"ad_close_{x}" for x in range(5)]
 UTILITY_TAB_DISACTIVATED = "utility_tab_disactivated"
 UTILITY_TAB_ACTIVATED = "utility_tab_activated"
 BLUESTACKS_BACK_BUTTON = "bluestacks_back_button"
+BLUESTACKS_HOME_BUTTON = "bluestacks_home_button"
+ROUND_REWARD_BUTTON = "round_reward_button"
+THE_TOWER_IMG = "the_tower_img"
 
-
-# def log(*args):
-#     line = ""
-#     for item in args:
-#         line += str(item) + " "
-#     print(line)
-#     log_file.write(line + "\n")
+# Colors
+AFFORDABLE_UPGRADE = (17, 58, 93)
 
 
 def on_press(key):
@@ -103,11 +113,15 @@ def click(pos):
     sleep(.5)
 
 
-def find_img(img_file_name, confidence=None):
+def find_img(img_file_name, confidence=None, full_screen=False):
+    img_path = ASSETS_PREFIX + img_file_name + ASSETS_FILE_TYPE
     if confidence is None:
-        return pyautogui.locateCenterOnScreen(ASSETS_PREFIX + img_file_name + ASSETS_FILE_TYPE)
+        if full_screen:
+            return pyautogui.locateCenterOnScreen(img_path)
+        else:
+            return pyautogui.locateCenterOnScreen(img_path, region=GAME_SCREEN_REGION)
     else:
-        return pyautogui.locateCenterOnScreen(ASSETS_PREFIX + img_file_name + ASSETS_FILE_TYPE, confidence=confidence)
+        return pyautogui.locateCenterOnScreen(img_path, confidence=confidence, region=GAME_SCREEN_REGION)
 
 
 def check_gem_5():
@@ -121,14 +135,14 @@ def check_gem_5():
         ad_start_time = time()
 
 
-def check_ad_finished():
-    global current_state
-    # print("checking ad finished")
-    for img in AD_CLOSE_BUTTONS:
-        pos = find_img(img)
-        if pos is not None:
-            print("found ad finished, closing ad")
-            click(pos)
+# def check_ad_finished():
+#     global current_state
+#     # print("checking ad finished")
+#     for img in AD_CLOSE_BUTTONS:
+#         pos = find_img(img)
+#         if pos is not None:
+#             print("found ad finished, closing ad")
+#             click(pos)
 
 
 def check_ad_closed():
@@ -142,39 +156,71 @@ def check_ad_closed():
         click(pos)
         change_state(State.BATTLING)
         return True
-    else:
-        return False
+
+    pos = find_img(CLAIM_REWARD_BUTTON)
+    if pos is not None:
+        print("found 1.5x coin claim, ad closed: ", time() - ad_start_time)
+        click(pos)
+        change_state(State.BATTLING)
+        return True
+
+    return False
 
 
 def check_gem_2():
     global gem_2_start_time
     # print("checking gem 2")
-    pos = find_img(GEM_2_BUTTON, 0.7)
-    if pos is not None:
-        print("found 2 gem: ", (time() - gem_2_start_time) / 60, " minutes")
-        summary["gem_2_rewards_claimed"] += 1
-        gem_2_start_time = time()
-        click(pos)
+    for img in GEM_2_BUTTONS:
+        pos = find_img(img, 0.9)
+        if pos is not None:
+            print("found 2 gem: ", (time() - gem_2_start_time) / 60, " minutes")
+            summary["gem_2_rewards_claimed"] += 1
+            gem_2_start_time = time()
+            click(pos)
+            break
 
 
 def check_game_over():
-    global current_state, round_time
+    global current_state, round_time, ad_start_time
     # print("checking game over")
     pos = find_img(RETRY_BUTTON)
     if pos is not None:
-        print("found game over, restarting")
         round_time = time()
+        # if round_time > 5 * ad_int:
+        #     reward_pos = find_img(ROUND_REWARD_BUTTON)
+        #     if reward_pos is not None:
+        #         print("found game over, watching reward ad")
+        #         click(reward_pos)
+        #         change_state(State.VIEWING_AD)
+        #         ad_start_time = time()
+        #         sleep(1)
+        #         return True
+
+        print("found game over, restarting")
         click(pos)
         change_state(State.BATTLING)
 
 
-def play_round():
-    print("playing round")
+def get_current_tab():
     pos = find_img(UTILITY_TAB_ACTIVATED)
-    if pos is None:
-        print("activating utility tab")
-        dPos = find_img(UTILITY_TAB_ACTIVATED)
-        if dPos is not None:
+    if pos is not None:
+        return Tab.UTILITY
+    else:
+        return Tab.UNKNOWN
+
+
+def play_round():
+    # print("playing round")
+    current_tab = get_current_tab()
+    if current_tab is Tab.UTILITY:
+        if random() > .5:
+            click((1173, 868))  # coins/wave
+        else:
+            click((823, 868))  # coin/kill bonus
+    else:
+        # print("activating utility tab")
+        pos = find_img(UTILITY_TAB_DISACTIVATED)
+        if pos is not None:
             click(pos)
             sleep(1)
         else:
@@ -182,17 +228,32 @@ def play_round():
             return False
 
 
-def reset_game():
+def exit_ad():
     global ad_start_time
     print("resetting game. Current state: ", current_state)
-    pos = find_img(BLUESTACKS_BACK_BUTTON)
+    pos = find_img(BLUESTACKS_BACK_BUTTON, full_screen=True)
     if pos is not None:
         click(pos)
         sleep(2)
+        ad_start_time = time() - ad_int
+
+
+def reset_game():
+    global current_state, summary
+    print("resetting game")
+    pos = find_img(BLUESTACKS_HOME_BUTTON, full_screen=True)
+    if pos is not None:
+        click(pos)
+        sleep(5)
+        pos_tower = find_img(THE_TOWER_IMG, full_screen=True)
+        if pos_tower is not None:
+            click(pos_tower)
+            summary["restarts"] += 1
+            sleep(5)
 
 
 def play():
-    global current_state, ad_start_time, ad_int, log_file
+    global current_state, ad_start_time, ad_int
     listener = keyboard.Listener(
         on_press=on_press,
         on_release=on_release)
@@ -210,17 +271,19 @@ def play():
                     check_gem_2()
                 if t - gem_5_start_time > gem_5_int:
                     check_gem_5()
+                play_round()
             elif current_state is State.VIEWING_AD:
                 # print("viewing add time: ", t - ad_start_time)
                 if t - ad_start_time > ad_max_timeout_int:
                     reset_game()
                 if t - ad_start_time > ad_int:
                     if not check_ad_closed():
-                        check_ad_finished()
+                        print("not closing ad on purpose")
+                        # exit_ad()
 
 
 # change_state(State.VIEWING_AD)
 play()
-log_file.close()
+# log_file.close()
 
-# cards for t6 sprints: extra orb, coins, critical coin, intro sprint, wave skip, crit chance
+# cards for t6 sprints: extra orb, coins, critical coin, intro sprint, wave skip, attack spd
