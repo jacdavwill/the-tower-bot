@@ -26,7 +26,6 @@ class Tab(enum.Enum):
 mouse = Controller()
 current_state = State.BATTLING
 past_state = State.BATTLING
-# log_file = open(f'./logs/{datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")}.txt', 'w')
 summary = {
     "gem_5_rewards_claimed": 0,
     "gem_2_rewards_claimed": 0,
@@ -45,11 +44,11 @@ round_time = time()
 
 # Intervals (seconds)
 ad_int = 35
-ad_max_timeout_int = 37
+ad_max_timeout_int = 60
 gem_5_int = 10 * 60  # 10 minutes
 gem_2_int = 15 * 60  # 15 minutes
 sprint_t6_int = 37
-restart_int = 30
+restart_int = 20
 
 # Assets
 ASSETS_PREFIX = "./assets/"
@@ -60,13 +59,12 @@ GEM_5_CLAIM_BUTTON = "gem_5_claim_button"
 CLAIM_REWARD_BUTTON = "claim_reward_button"
 GEM_2_BUTTONS = [f"gem_2_button_{x}" for x in range(4)]
 RETRY_BUTTON = "retry_button"
-# AD_CLOSE_BUTTONS = [f"ad_close_{x}" for x in range(5)]
 UTILITY_TAB_DISACTIVATED = "utility_tab_disactivated"
 UTILITY_TAB_ACTIVATED = "utility_tab_activated"
 BLUESTACKS_BACK_BUTTON = "bluestacks_back_button"
 BLUESTACKS_HOME_BUTTON = "bluestacks_home_button"
 ROUND_REWARD_BUTTON = "round_reward_button"
-THE_TOWER_IMG = "the_tower_img"
+THE_TOWER_IMGS = ["the_tower_img", "the_tower_img_larger"]
 
 # Colors
 AFFORDABLE_UPGRADE = (17, 58, 93)
@@ -135,16 +133,6 @@ def check_gem_5():
         ad_start_time = time()
 
 
-# def check_ad_finished():
-#     global current_state
-#     # print("checking ad finished")
-#     for img in AD_CLOSE_BUTTONS:
-#         pos = find_img(img)
-#         if pos is not None:
-#             print("found ad finished, closing ad")
-#             click(pos)
-
-
 def check_ad_closed():
     global current_state, summary, gem_5_start_time
     # print("checking ad closed")
@@ -171,12 +159,12 @@ def check_gem_2():
     global gem_2_start_time
     # print("checking gem 2")
     for img in GEM_2_BUTTONS:
-        pos = find_img(img, 0.9)
+        pos = find_img(img, 0.7)
         if pos is not None:
+            click(pos)
             print("found 2 gem: ", (time() - gem_2_start_time) / 60, " minutes")
             summary["gem_2_rewards_claimed"] += 1
             gem_2_start_time = time()
-            click(pos)
             break
 
 
@@ -185,16 +173,16 @@ def check_game_over():
     # print("checking game over")
     pos = find_img(RETRY_BUTTON)
     if pos is not None:
-        round_time = time()
-        # if round_time > 5 * ad_int:
-        #     reward_pos = find_img(ROUND_REWARD_BUTTON)
-        #     if reward_pos is not None:
-        #         print("found game over, watching reward ad")
-        #         click(reward_pos)
-        #         change_state(State.VIEWING_AD)
-        #         ad_start_time = time()
-        #         sleep(1)
-        #         return True
+        t = time() - round_time
+        if t > 3 * ad_int:
+            reward_pos = find_img(ROUND_REWARD_BUTTON)
+            if reward_pos is not None:
+                print("found game over, watching reward ad")
+                click(reward_pos)
+                change_state(State.VIEWING_AD)
+                ad_start_time = time()
+                sleep(1)
+                return True
 
         print("found game over, restarting")
         click(pos)
@@ -213,7 +201,7 @@ def play_round():
     # print("playing round")
     current_tab = get_current_tab()
     if current_tab is Tab.UTILITY:
-        if random() > .5:
+        if True:
             click((1173, 868))  # coins/wave
         else:
             click((823, 868))  # coin/kill bonus
@@ -230,12 +218,11 @@ def play_round():
 
 def exit_ad():
     global ad_start_time
-    print("resetting game. Current state: ", current_state)
+    print("exiting ad")
     pos = find_img(BLUESTACKS_BACK_BUTTON, full_screen=True)
     if pos is not None:
         click(pos)
         sleep(2)
-        ad_start_time = time() - ad_int
 
 
 def reset_game():
@@ -245,11 +232,12 @@ def reset_game():
     if pos is not None:
         click(pos)
         sleep(5)
-        pos_tower = find_img(THE_TOWER_IMG, full_screen=True)
-        if pos_tower is not None:
-            click(pos_tower)
-            summary["restarts"] += 1
-            sleep(5)
+        for img in THE_TOWER_IMGS:
+            pos_tower = find_img(img, full_screen=True)
+            if pos_tower is not None:
+                click(pos_tower)
+                summary["restarts"] += 1
+                sleep(5)
 
 
 def play():
@@ -278,12 +266,8 @@ def play():
                     reset_game()
                 if t - ad_start_time > ad_int:
                     if not check_ad_closed():
-                        print("not closing ad on purpose")
-                        # exit_ad()
+                        exit_ad()
 
 
 # change_state(State.VIEWING_AD)
 play()
-# log_file.close()
-
-# cards for t6 sprints: extra orb, coins, critical coin, intro sprint, wave skip, attack spd

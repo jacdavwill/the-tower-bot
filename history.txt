@@ -1,3 +1,7 @@
+Low Tier:
+Date     - Tier, Speed, Wave, Time, Coins
+10/30/22 - 8,    4.0,   W30,  90s,  10.5K
+
 10/27/22 -------------------------------------------------------------------
 {'gem_5_rewards_claimed': 42, 'gem_2_rewards_claimed': 35, 'start_time': 1666881667.2169273, 'start_coins': '187.20K', 'start_gems': 1008}
 Total run time:  29333.380137443542  seconds
