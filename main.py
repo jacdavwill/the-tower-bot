@@ -3,6 +3,7 @@ from pynput import keyboard
 import pyautogui
 import enum
 from time import sleep, time
+import math
 import datetime
 from random import random
 
@@ -33,6 +34,10 @@ summary = {
 }
 GAME_SCREEN_REGION = (660, 41, 560, 988)  # left, top, width, height
 TAB_SCREEN_REGION = (660, 971, 560, 60)
+TOWER_CENTER = (939, 330)
+GEM_DIST = 73  # (974, 394)
+NUM_GEM_CHECK_PTS = 30
+GEM_5_POS = (713, 503)
 
 # Times
 gem_5_start_time = 0
@@ -43,6 +48,10 @@ round_time = time()
 gem_5_int = 10 * 60  # 10 minutes
 gem_2_int = 15 * 60  # 15 minutes
 restart_int = 10
+force_restart_int = 100
+gem_2_check_after = 45
+
+checked_gem_2 = False
 
 # Assets
 ASSETS_PREFIX = "./assets/"
@@ -55,9 +64,11 @@ GEM_2_BUTTONS = [f"gem_2_button_{x}" for x in range(4)]
 RETRY_BUTTON = "retry_button"
 UTILITY_TAB_DISACTIVATED = "utility_tab_disactivated"
 UTILITY_TAB_ACTIVATED = "utility_tab_activated"
-# BLUESTACKS_BACK_BUTTON = "bluestacks_back_button"
+BLUESTACKS_BACK_BUTTON = "bluestacks_back_button"
+END_ROUND_BUTTON = "end_round_button"
 # BLUESTACKS_HOME_BUTTON = "bluestacks_home_button"
-THE_TOWER_IMGS = ["the_tower_img", "the_tower_img_larger"]
+# THE_TOWER_IMGS = ["the_tower_img", "the_tower_img_larger"]
+
 
 # Colors
 AFFORDABLE_UPGRADE = (17, 58, 93)
@@ -97,10 +108,10 @@ def change_state(new_state):
     current_state = new_state
 
 
-def click(pos, clicks=1):
+def click(pos, clicks=1, wait=0.25):
     mouse.position = pos
     mouse.click(button=Button.left, count=clicks)
-    sleep(.25)
+    sleep(wait)
 
 
 def find_img(img_file_name, confidence=None, full_screen=False, region=GAME_SCREEN_REGION):
@@ -115,32 +126,41 @@ def find_img(img_file_name, confidence=None, full_screen=False, region=GAME_SCRE
 
 
 def check_gem_5():
-    global gem_5_start_time
-    pos = find_img(GEM_5_BUTTON)
-    if pos is not None:
-        click(pos)
-        print("found 5 gem: ", (time() - gem_5_start_time) / 60, " minutes")
-        summary["gem_5_rewards_claimed"] += 1
-        gem_5_start_time = time()
+    # global gem_5_start_time
+    # pos = find_img(GEM_5_BUTTON)
+    # if pos is not None:
+    #     click(pos)
+    #     print("found 5 gem: ", (time() - gem_5_start_time) / 60, " minutes")
+    #     summary["gem_5_rewards_claimed"] += 1
+    #     gem_5_start_time = time()
 
+    click(GEM_5_POS)
 
 
 def check_gem_2():
-    global gem_2_start_time
-    for img in GEM_2_BUTTONS:
-        pos = find_img(img, 0.7)
-        if pos is not None:
-            click(pos)
-            print("found 2 gem: ", (time() - gem_2_start_time) / 60, " minutes")
-            summary["gem_2_rewards_claimed"] += 1
-            gem_2_start_time = time()
+    global gem_2_start_time, checked_gem_2
+    checked_gem_2 = True
+    # for img in GEM_2_BUTTONS:
+    #     pos = find_img(img, 0.7)
+    #     if pos is not None:
+    #         click(pos)
+    #         print("found 2 gem: ", (time() - gem_2_start_time) / 60, " minutes")
+    #         summary["gem_2_rewards_claimed"] += 1
+    #         gem_2_start_time = time()
+
+    for i in range(NUM_GEM_CHECK_PTS):
+        angle = (360 / NUM_GEM_CHECK_PTS) * i
+        pos_x = TOWER_CENTER[0] + (GEM_DIST * math.cos(math.radians(angle)))
+        pos_y = TOWER_CENTER[1] + (GEM_DIST * math.sin(math.radians(angle)))
+        click((pos_x, pos_y), wait=0)
 
 
 def check_game_over():
-    global current_state, round_time, summary
+    global current_state, round_time, summary, checked_gem_2
     pos = find_img(RETRY_BUTTON)
     if pos is not None:
         round_time = time()
+        checked_gem_2 = False
         summary["rounds"] += 1
         click(pos)
         change_state(State.STARTING)
@@ -155,22 +175,36 @@ def get_current_tab():
 
 
 def play_round():
-    global current_state
-    if current_state == State.STARTING:
-        current_tab = get_current_tab()
-    else:
-        current_tab = Tab.UTILITY
+    # global current_state
+    # if current_state == State.STARTING:
+    #     current_tab = get_current_tab()
+    # else:
+    #     current_tab = Tab.UTILITY
+    #
+    # if current_tab is Tab.UTILITY:
+    if True:
+        click((853, 933))  # Range
+    # elif False:
+    #     click((1173, 868), clicks=5)  # coins/wave
+    # else:
+    #     click((823, 868))  # coin/kill bonus
+    # else:
+    #     pos = find_img(UTILITY_TAB_DISACTIVATED, region=TAB_SCREEN_REGION)
+    #     if pos is not None:
+    #         click(pos)
+    #         sleep(1)
 
-    if current_tab is Tab.UTILITY:
-        if True:
-            click((1173, 868), clicks=5)  # coins/wave
-        else:
-            click((823, 868))  # coin/kill bonus
-    else:
-        pos = find_img(UTILITY_TAB_DISACTIVATED, region=TAB_SCREEN_REGION)
-        if pos is not None:
-            click(pos)
-            sleep(1)
+
+def restart_round():
+    back_pos = find_img(BLUESTACKS_BACK_BUTTON, full_screen=True)
+    if back_pos is not None:
+        click(back_pos)
+    sleep(1)
+
+    end_round_pos = find_img(END_ROUND_BUTTON)
+    if end_round_pos:
+        click(end_round_pos)
+    sleep(1)
 
 
 # def reset_game():
@@ -195,21 +229,22 @@ def play():
         on_release=on_release)
     listener.start()
 
+    sleep(3)
     while current_state is not State.QUITTING:
-        # sleep(1)
-        # print('Mouse: {0}, Color: {1}'.format(mouse.position, pyautogui.pixel(*mouse.position)))
         if current_state is not State.PAUSED:
+            # sleep(1)
+            # print('Mouse: {0}, Color: {1}'.format(mouse.position, pyautogui.pixel(*mouse.position)))
             t = time()
             if t - round_time > restart_int:
                 check_game_over()
-            if t - gem_2_start_time > gem_2_int:
+            if t - round_time > gem_2_check_after:  # t - gem_2_start_time > gem_2_int:
                 check_gem_2()
             if t - gem_5_start_time > gem_5_int:
                 check_gem_5()
-            play_round()
+            if t - round_time > force_restart_int:
+                restart_round()
+            if t - round_time < 10:
+                play_round()
 
 
 play()
-
-# 7.95, 8.56, 7.78 = 8.1 c/w
-#
