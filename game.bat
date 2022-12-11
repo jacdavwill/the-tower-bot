@@ -1,2 +1,1 @@
-cd C:\Users\fae12\PycharmProjects\TheTowerIdleBot
-.\venv\Scripts\python.exe main.py
+C:\Users\jacda\AppData\Local\Programs\Python\Python39\python.exe C:\Users\jacda\PycharmProjects\the-tower-bot\main.py
