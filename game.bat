@@ -1,1 +1,0 @@
-C:\Users\jacda\AppData\Local\Programs\Python\Python39\python.exe C:\Users\jacda\PycharmProjects\the-tower-bot\main.py

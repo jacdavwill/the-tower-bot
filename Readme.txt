@@ -1,2 +1,2 @@
-1. Open Bluestacks 5
-2. Use the Maximize button to make it fill the laptop screen
+1. Open app on Mac (with external monitor)
+2. Use the smaller version (Settings > smaller)
