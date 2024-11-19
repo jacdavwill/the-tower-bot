@@ -1,3 +1,4 @@
+import os
 from pynput.mouse import Button, Controller as MouseController
 from pynput.keyboard import Key, KeyCode, Controller as KeyboardController
 from pynput import keyboard as mainKeyboard
@@ -7,14 +8,16 @@ from time import sleep, time
 import math
 import Quartz
 import cv2  # pip install opencv-python
-import numpy
+import numpy  # this is still needed
+import pyscreeze  # this is still needed
+from datetime import datetime
+import pytesseract
 
 
 class State(enum.Enum):
     PAUSED = 1
     QUITTING = 2
-    STARTING = 10
-    BATTLING = 11
+    PLAYING = 10
 
 
 class Tab(enum.Enum):
@@ -25,47 +28,81 @@ class Tab(enum.Enum):
     UNKNOWN = 5
 
 
+class Direction(enum.Enum):
+    UP = 1
+    DOWN = 2
+
+
+class MenuPosition(enum.Enum):
+    TOP = 1
+    BOTTOM = 2
+    UNKNOWN = 3
+
+
 mouse = MouseController()
 keyboard = KeyboardController()
-current_state = State.STARTING
-past_state = State.STARTING
+current_state = State.PAUSED
+past_state = State.PLAYING
 stop_picking_perks = False
+current_wave = 0
 GAME_SCREEN_REGION = (0, 0, 0, 0)  # left, top, width, height.   This is populated by verify_window()
 TAB_SCREEN_REGION = (660, 971, 560, 60)
 TOWER_CENTER_OFFSET = (296, 217)
 GEM_DIST = 64  # offset (302, 153)
 NUM_GEM_CHECK_PTS = 30
 GEM_5_OFFSET = (111, 396)
+WAVE_COUNTER_REGION = (360, 452, 56, 20)
 
-# Tabs
-ATTACK_TAB_POS = (732, 1000)
-DEFENSE_TAB_POS = (869, 1000)
-UTILITY_TAB_POS = (1008, 1000)
-UW_TAB_POS = (1150, 1000)
+# Tesseract setup (brew install tesseract)
+pytesseract.pytesseract.tesseract_cmd = r'/opt/homebrew/bin/tesseract'
+
+# Game
+MAX_PERK_OPTIONS = 4
+
+# Menu
+ATTACK_TAB_OFFSET = (43, 797)
+DEFENSE_TAB_OFFSET = (187, 797)
+UTILITY_TAB_OFFSET = (333, 797)
+UW_TAB_OFFSET = (480, 797)
 current_tab = Tab.UNKNOWN
+TOP_MENU_SWIPE_OFFSET = (297, 560)
+BOTTOM_MENU_SWIPE_OFFSET = (297, 758)
+attack_tab_menu_position = MenuPosition.UNKNOWN
+defense_tab_menu_position = MenuPosition.UNKNOWN
+utility_tab_menu_position = MenuPosition.UNKNOWN
+
+# Game Buttons
+EXIT_BUTTON = "exit_button"
+RETRY_BUTTON = "retry_button"
+MORE_STATS_BUTTON = "more_stats_button"
 
 # Upgrades
-UPGRADE_1_OFFSET = (239, 584)
+UPGRADE_1_OFFSET = (239, 562)
+UPGRADE_4_OFFSET = (450, 667)
 
 # Times
 gem_5_last_check_time = 0
 gem_2_last_check_time = 0
-round_time = time()
+game_over_last_check_time = 0
+perk_last_check_time = 0
+wave_last_check_time = 0
 
 # Intervals (seconds)
 gem_5_int = 10
 gem_2_int = 30
-restart_int = 3
+game_over_int = 30
+perk_int = 20
+wave_int = 60
 
 # Assets
-ASSETS_PREFIX = "./assets/"
+USING_EXTERNAL_MONITOR = Quartz.CGMainDisplayID() != 1
+PROJECT_DIR = "/Users/jacobwilliams/dev/the-tower-bot/"
+ASSETS_SCREEN_DIR = "monitor/" if USING_EXTERNAL_MONITOR else "laptop/"
+ASSETS_BASE_DIR = PROJECT_DIR + "assets/"
+ASSETS_DIR = ASSETS_BASE_DIR + ASSETS_SCREEN_DIR
 ASSETS_FILE_TYPE = ".png"
-RETRY_BUTTON = "retry_button"
-END_ROUND_BUTTON = "end_round_button"
-NOT_RESPONDING_WAIT = "not_responding_wait"
-
-# Colors
-AFFORDABLE_UPGRADE = (17, 58, 93)
+PERKS_DIR = "perks/"
+STATS_DIR = "stats-history/"
 
 
 # Perks
@@ -79,43 +116,51 @@ class Perk:
         self.desc = desc
         self.priority = priority
 
+    def __str__(self):
+        return self.desc
 
-USING_EXTERNAL_MONITOR = Quartz.CGMainDisplayID() != 1
-PERK_POS = (712, 170, 122, 219)  # left, top, width, height
-NEW_PERK_BUTTON = "new_perk_button_monitor" if USING_EXTERNAL_MONITOR else "new_perk_button_laptop"
-CHOOSE_ANOTHER_PERK = "choose_another_perk"
-PERK_EXIT_BUTTON = "perk_exit_button"
+
+PERK_POS_OFFSET = (110, 134, 105, 334)  # left, top, width, height
+POINT_OFF_PERKS_SCREEN_OFFSET = (60, 200)
+NEW_PERK_BUTTON = "new_perk_button"
+CHOOSE_A_NEW_PERK = "choose_a_new_perk"
+NEVER_PRIORITY = 1000
 PERKS = [
-    Perk(1, "perk_tradeoff_2", "x coins, but tower max health -70.0%"),
-    Perk(2, "perk_common_11", "perk wave requirement -x%"),
-    Perk(3, "perk_uw_4", "golden tower bonus x1.5"),
-    Perk(4, "perk_common_4", "x all coin bonuses"),
-    Perk(5, "perk_common_13", "increase max game speed by +x"),
-    Perk(6, "perk_tradeoff_4", "enemies damage -50%, but tower damage -50%"),
-    Perk(7, "perk_common_10", "defense percent +x%"),
-    Perk(8, "perk_common_1", "x max health"),
-    Perk(9, "perk_common_8", "orbs +1"),
-    # Perk(10, "perk_tradeoff_10", "lifesteal x2.50, but knockback force -70%"),
-    Perk(11, "perk_common_2", "x damage"),
-    # Perk(12, "perk_uw_3", "+1 wave on death wave"),
-    Perk(13, "perk_common_9", "free upgrade chance for all +x%"),
-    Perk(14, "perk_common_5", "bounce shot +2"),
-    Perk(100, "perk_common_6", "interest x"),
-    Perk(100, "perk_common_7", "land mine damage xx"),
-    Perk(100, "perk_uw_6", "chrono field radius x1.5"),
-    Perk(100, "perk_tradeoff_3", "enemies have -x% health, but tower health regen and lifesteal -90%"),
-    Perk(100, "perk_common_3", "x health regen"),
-    Perk(101, "perk_common_12", "unlock a random ultimate weapon"),
-    # Perk(101, "perk_uw_1", "4 more smart missiles"),
-    Perk(101, "perk_uw_2", "swamp radius x1.5"),
-    # Perk(101, "perk_uw_5", "chain lightning damage x2"),
-    Perk(101, "perk_uw_7", "extra set of inner mines"),
-    # Perk(13, "perk_tradeoff_1", "x tower damage, but bosses have x8 health"),
-    # Perk(9, "perk_tradeoff_5", "ranged enemies attach distance reduced, but ranged enemies damage x3"),
-    # Perk(100, "perk_tradeoff_6", "enemies speed -40%, but enemies damage x2.5"),
-    # Perk(100, "perk_tradeoff_7", "x12.00 cash per wave, but enemy kill doesn't give cash"),
-    # Perk(100, "perk_tradeoff_8", "tower health regen x8.00, but tower max health -60%"),
-    # Perk(12, "perk_tradeoff_9", "boss health -70.0%, but boss speed +50%"),
+    Perk(1, "perk_common_pwr", "perk wave requirement -x%"),
+    Perk(2, "perk_tradeoff_coins_health", "x coins, but tower max health -70.0%"),
+    Perk(3, "perk_uw_golden_tower", "golden tower bonus x1.5"),
+    Perk(4, "perk_common_coins", "x all coin bonuses"),
+    Perk(5, "perk_common_game_speed", "increase max game speed by +x"),
+    Perk(6, "perk_tradeoff_damage_damage", "enemies damage -50%, but tower damage -50%"),
+    Perk(7, "perk_common_defence", "defense percent +x%"),
+    Perk(8, "perk_common_health", "x max health"),
+    Perk(9, "perk_common_free_upgrades", "free upgrade chance for all +x%"),
+    Perk(10, "perk_common_cash", "x cash bonus"),
+    Perk(11, "perk_common_damage", "x damage"),
+    Perk(12, "perk_uw_black_hole", "black hole duration +x"),
+    Perk(13, "perk_common_orbs", "orbs +1"),
+    Perk(14, "perk_uw_death_wave", "+1 wave on death wave"),
+    Perk(15, "perk_uw_chain_lightning", "chain lightning damage x2"),
+    Perk(6, "perk_common_random_uw", "unlock a random ultimate weapon"),
+    Perk(17, "perk_common_bounce_shot", "bounce shot +2"),
+    Perk(18, "perk_tradeoff_damage_boss_health", "x tower damage, but bosses have x8 health"),
+    Perk(20, "perk_uw_spotlight", "spotlight damage bonus x"),
+    Perk(20, "perk_uw_smart_missiles", "4 more smart missiles"),
+    Perk(20, "perk_uw_poison_swamp", "swamp radius x1.5"),
+    Perk(20, "perk_uw_inner_land_mines", "extra set of inner mines"),
+    Perk(20, "perk_uw_chrono_field", "chrono field duration +x"),
+    Perk(100, "perk_common_defense_absolute", "x defense absolute"),
+    Perk(100, "perk_common_interest", "interest x"),
+    Perk(100, "perk_common_land_mine", "land mine damage x"),
+    Perk(100, "perk_tradeoff_health_speed", "boss health -70.0%, but boss speed +50%"),
+    Perk(100, "perk_common_health_regen", "x health regen"),
+
+    Perk(NEVER_PRIORITY, "perk_tradeoff_lifesteal_knockback", "lifesteal x2.50, but knockback force -70%"),
+    Perk(NEVER_PRIORITY, "perk_tradeoff_ranged", "ranged enemies attach distance reduced, but ranged enemies damage x3"),
+    Perk(NEVER_PRIORITY, "perk_tradeoff_speed_damage", "enemies speed -40%, but enemies damage x2.5"),
+    # Perk(NEVER_PRIORITY, "perk_tradeoff_7", "x12.00 cash per wave, but enemy kill doesn't give cash"),
+    Perk(NEVER_PRIORITY, "perk_tradeoff_tower_regen_health", "tower health regen x8.00, but tower max health -60%"),
+    Perk(NEVER_PRIORITY, "perk_tradeoff_enemy_health_tower_lifesteal", "enemies have -x% health, but tower health regen and lifesteal -90%"),
 ]
 
 
@@ -125,18 +170,44 @@ def on_press(key):
 
 
 def on_release(key):
-    global current_state, past_state, current_tab
+    global current_state, past_state, current_tab, attack_tab_menu_position, defense_tab_menu_position, utility_tab_menu_position
     if key == Key.alt_r:  # This is the right option key
         if current_state == State.PAUSED:
             print("Un-pausing game!")
             change_state(past_state)
             current_tab = Tab.UNKNOWN
+            verify_window()
+            attack_tab_menu_position = MenuPosition.UNKNOWN
+            defense_tab_menu_position = MenuPosition.UNKNOWN
+            utility_tab_menu_position = MenuPosition.UNKNOWN
+
         else:
             print("Pausing game!")
             change_state(State.PAUSED)
-    elif key == KeyCode.from_vk(179) or key == Key.ctrl_r:  # This is actually the right command button because I have switched the mapping
+    elif key == KeyCode.from_vk(
+            179) or key == Key.ctrl_r:  # This is actually the right command button because I have switched the mapping
         print("Quitting!")
         change_state(State.QUITTING)
+
+
+def convert_assets_to_laptop():
+    image_scale = 2
+    num_assets_created = 0
+    laptop_assets_dir = PROJECT_DIR + "assets/laptop/"
+    # find existing assets so we don't overwrite
+    assets = []
+    for file in os.listdir(laptop_assets_dir):
+        if file.endswith(ASSETS_FILE_TYPE):
+            assets.append(file)
+
+    # create new assets
+    for file in os.listdir(ASSETS_DIR):
+        if file.endswith(ASSETS_FILE_TYPE) and file not in assets:
+            img = cv2.imread(ASSETS_DIR + file)
+            img_resized = cv2.resize(img, (0, 0), fx=image_scale, fy=image_scale)
+            cv2.imwrite(laptop_assets_dir + file, img_resized)
+            num_assets_created += 1
+    print(str(num_assets_created) + " assets updated")
 
 
 def change_state(new_state):
@@ -145,7 +216,7 @@ def change_state(new_state):
     current_state = new_state
 
 
-def click(pos, clicks=1, wait=0.25, wait_after_reposition=0.0, screen_offset=False):
+def click(pos, clicks=1, wait=0.25, wait_after_reposition=0.25, screen_offset=False):
     origin = GAME_SCREEN_REGION[:2]
     if screen_offset:  # if the offset is for the whole screen and not the game region (this happens when locating imgs)
         origin = 0, 0
@@ -156,125 +227,208 @@ def click(pos, clicks=1, wait=0.25, wait_after_reposition=0.0, screen_offset=Fal
     sleep(wait)
 
 
-def find_img(img_file_name, confidence=None, region=None, grayscale=False):
-    global USING_EXTERNAL_MONITOR
-    img_path = ASSETS_PREFIX + img_file_name + ASSETS_FILE_TYPE
+def find_img(img_file_name, confidence=None, region=None, game_screen_offset=None, grayscale=False):
+    img_path = ASSETS_BASE_DIR + img_file_name + ASSETS_FILE_TYPE
+    needle_img = cv2.imread(img_path)
+    pos_offset = 0, 0
     if region is None:
         region = GAME_SCREEN_REGION
-    if not USING_EXTERNAL_MONITOR:
-        region = region[0] * 2, region[1] * 2, region[2] * 2, region[3] * 2
+        pos_offset = GAME_SCREEN_REGION[0], GAME_SCREEN_REGION[1]
+    if game_screen_offset is not None:
+        region = GAME_SCREEN_REGION[0] + game_screen_offset[0], GAME_SCREEN_REGION[1] + game_screen_offset[1], \
+            game_screen_offset[2], game_screen_offset[3]
+        pos_offset = GAME_SCREEN_REGION[0] + game_screen_offset[0], GAME_SCREEN_REGION[1] + game_screen_offset[1]
+    haystack = pyautogui.screenshot(region=region)
     try:
         if confidence is None:
-            pos = pyautogui.locateCenterOnScreen(img_path, region=region, grayscale=grayscale)
+            pos = pyautogui.locate(needle_img, haystack, grayscale=grayscale)
         else:
-            pos = pyautogui.locateCenterOnScreen(img_path, confidence=confidence, region=region, grayscale=grayscale)
-    except pyautogui.ImageNotFoundException as e:
+            pos = pyautogui.locate(needle_img, haystack, confidence=confidence, grayscale=grayscale)
+    except pyautogui.ImageNotFoundException:
         return None
 
-    return pos if USING_EXTERNAL_MONITOR else (pos[0] / 2, pos[1] / 2)
+    # img shape is h, w, d
+    return pos[0] + pos_offset[0] + (needle_img.shape[1] / 2), pos[1] + pos_offset[1] + (needle_img.shape[0] / 2)
+
+
+def find_img_in_img(haystack_img, needle_img_file_name, confidence=None, grayscale=False):
+    needle_img = cv2.imread(needle_img_file_name)
+    try:
+        if confidence is not None:
+            pos = pyautogui.locate(needle_img, haystack_img, grayscale=grayscale, confidence=confidence)
+        else:
+            pos = pyautogui.locate(needle_img, haystack_img, grayscale=grayscale)
+        # img shape is h, w, d
+        return pos[0] + (needle_img.shape[1] / 2), pos[1] + (needle_img.shape[0] / 2)
+    except pyautogui.ImageNotFoundException:
+        return None
 
 
 def check_gem_5():
     global gem_5_last_check_time
     gem_5_last_check_time = time()
-    click(GEM_5_OFFSET)
+    click(GEM_5_OFFSET, wait_after_reposition=0.0)
 
 
 def check_gem_2():
     global gem_2_last_check_time
     gem_2_last_check_time = time()
     for i in range(NUM_GEM_CHECK_PTS):
-        angle = 360 - (360 / NUM_GEM_CHECK_PTS) * i
-        pos_x = TOWER_CENTER_OFFSET[0] + (GEM_DIST * math.cos(math.radians(angle)))
-        pos_y = TOWER_CENTER_OFFSET[1] + (GEM_DIST * math.sin(math.radians(angle)))
-        click((pos_x, pos_y), wait=.1)
+        if current_state == State.PLAYING:
+            angle = 360 - (360 / NUM_GEM_CHECK_PTS) * i
+            pos_x = TOWER_CENTER_OFFSET[0] + (GEM_DIST * math.cos(math.radians(angle)))
+            pos_y = TOWER_CENTER_OFFSET[1] + (GEM_DIST * math.sin(math.radians(angle)))
+            click((pos_x, pos_y), wait=.1, wait_after_reposition=0.0)
 
 
-def check_game_over(with_restart=True):
-    global current_state, round_time, summary, current_tab, stop_picking_perks
-    pos = find_img(RETRY_BUTTON)
-    if pos is not None:
-        sleep(1)
-        round_time = time()
-
-        click(pos)
-
-        # doing short reset because uncleared enemies can cause loss of Second Wind
-        if with_restart:
-            sleep(2)
-            restart_round()
-            check_game_over(with_restart=False)
-
-        summary["rounds"] += 1
-        change_state(State.STARTING)
+def check_game_over():
+    global current_state, game_over_last_check_time, current_tab, stop_picking_perks
+    game_over_last_check_time = time()
+    retry_pos = find_img(RETRY_BUTTON, confidence=0.8, grayscale=True)
+    if retry_pos is not None:
+        stats_pos = find_img(MORE_STATS_BUTTON, confidence=0.8, grayscale=True)
+        if stats_pos is not None:
+            click(stats_pos, screen_offset=True)
+            filename = datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ASSETS_FILE_TYPE
+            pyautogui.screenshot(filename, region=GAME_SCREEN_REGION).save(PROJECT_DIR + STATS_DIR + filename)
+            sleep(.5)
+            exit_pos = find_img(EXIT_BUTTON, confidence=0.8)
+            if exit_pos is not None:
+                click(exit_pos, screen_offset=True)
+            else:
+                click(UW_TAB_OFFSET)
+            sleep(.5)
+        click(retry_pos, screen_offset=True)
+        change_state(State.PLAYING)
         current_tab = Tab.UNKNOWN
         stop_picking_perks = False
+
+
+def swipe_menu(direction=Direction.UP, times=3):
+    sleep(0.5)
+    for i in range(times):
+        if direction is Direction.UP:
+            mouse.position = GAME_SCREEN_REGION[0] + BOTTOM_MENU_SWIPE_OFFSET[0], GAME_SCREEN_REGION[1] + \
+                             BOTTOM_MENU_SWIPE_OFFSET[1]
+            swipe_direction = -200
+        else:
+            mouse.position = GAME_SCREEN_REGION[0] + TOP_MENU_SWIPE_OFFSET[0], GAME_SCREEN_REGION[1] + \
+                             TOP_MENU_SWIPE_OFFSET[1]
+            swipe_direction = 200
+        pyautogui.drag(0, swipe_direction, 0.2, button='left')
+    sleep(0.5)
 
 
 def set_tab(tab):
     global current_tab
     if current_tab is not tab:
         if current_tab is Tab.UNKNOWN:
-            click(UW_TAB_POS)
+            click(UW_TAB_OFFSET)
 
         if tab is Tab.ATTACK:
-            click(ATTACK_TAB_POS)
+            click(ATTACK_TAB_OFFSET)
             current_tab = Tab.ATTACK
         elif tab is Tab.DEFENSE:
-            click(DEFENSE_TAB_POS)
+            click(DEFENSE_TAB_OFFSET)
             current_tab = Tab.DEFENSE
         elif tab is Tab.UTILITY:
-            click(UTILITY_TAB_POS)
+            click(UTILITY_TAB_OFFSET)
             current_tab = Tab.UTILITY
 
 
-def play_round():
-    global current_state
+def set_menu_position(menu_position):
+    global attack_tab_menu_position, defense_tab_menu_position, utility_tab_menu_position, current_tab
+    if current_tab is Tab.UNKNOWN:
+        set_tab(Tab.DEFENSE)
 
-    # set_tab(Tab.DEFENSE)
-    sleep(.25)
-    click(UPGRADE_1_OFFSET)
-
-
-def restart_round():
-    global keyboard
-    keyboard.tap(Key.esc)
-
-    end_round_pos = find_img(END_ROUND_BUTTON)
-    if end_round_pos:
-        click(end_round_pos)
-    sleep(1)
+    if current_tab is Tab.ATTACK:
+        if attack_tab_menu_position is MenuPosition.UNKNOWN:
+            if menu_position is MenuPosition.TOP:
+                swipe_menu(direction=Direction.DOWN)
+                attack_tab_menu_position = MenuPosition.TOP
+            else:
+                swipe_menu(direction=Direction.UP)
+                attack_tab_menu_position = MenuPosition.BOTTOM
+        elif menu_position is MenuPosition.TOP and attack_tab_menu_position is MenuPosition.BOTTOM:
+            swipe_menu(direction=Direction.DOWN)
+            attack_tab_menu_position = MenuPosition.TOP
+        elif menu_position is MenuPosition.BOTTOM and attack_tab_menu_position is MenuPosition.TOP:
+            swipe_menu(direction=Direction.UP)
+            attack_tab_menu_position = MenuPosition.BOTTOM
+    elif current_tab is Tab.DEFENSE:
+        if defense_tab_menu_position is MenuPosition.UNKNOWN:
+            if menu_position is MenuPosition.TOP:
+                swipe_menu(direction=Direction.DOWN)
+                defense_tab_menu_position = MenuPosition.TOP
+            else:
+                swipe_menu(direction=Direction.UP)
+                defense_tab_menu_position = MenuPosition.BOTTOM
+        elif menu_position is MenuPosition.TOP and defense_tab_menu_position is MenuPosition.BOTTOM:
+            swipe_menu(direction=Direction.DOWN)
+            defense_tab_menu_position = MenuPosition.TOP
+        elif menu_position is MenuPosition.BOTTOM and defense_tab_menu_position is MenuPosition.TOP:
+            swipe_menu(direction=Direction.UP)
+            defense_tab_menu_position = MenuPosition.BOTTOM
+    elif current_tab is Tab.UTILITY:
+        if utility_tab_menu_position is MenuPosition.UNKNOWN:
+            if menu_position is MenuPosition.TOP:
+                swipe_menu(direction=Direction.DOWN, times=2)
+                utility_tab_menu_position = MenuPosition.TOP
+            else:
+                swipe_menu(direction=Direction.UP, times=2)
+                utility_tab_menu_position = MenuPosition.BOTTOM
+        elif menu_position is MenuPosition.TOP and utility_tab_menu_position is MenuPosition.BOTTOM:
+            swipe_menu(direction=Direction.DOWN, times=2)
+            utility_tab_menu_position = MenuPosition.TOP
+        elif menu_position is MenuPosition.BOTTOM and utility_tab_menu_position is MenuPosition.TOP:
+            swipe_menu(direction=Direction.UP, times=2)
+            utility_tab_menu_position = MenuPosition.BOTTOM
 
 
 def check_perk():
-    global stop_picking_perks
-    pos = find_img(NEW_PERK_BUTTON, confidence=0.7)
-    if pos is not None:
+    global stop_picking_perks, perk_last_check_time
+    perk_last_check_time = time()
+    new_perk_pos = find_img(NEW_PERK_BUTTON, confidence=0.7, grayscale=True)
+    if new_perk_pos is not None:
         sleep(1)
-        click(pos, wait_after_reposition=0.1, screen_offset=True)
+        click(new_perk_pos, screen_offset=True)
         more_perks_to_select = True
         while more_perks_to_select:
-            perk_to_select = None
+            perk_to_select = None  # (perk, pos)
+            perks_identified = 0
+            perk_region = GAME_SCREEN_REGION[0] + PERK_POS_OFFSET[0], GAME_SCREEN_REGION[1] + PERK_POS_OFFSET[1], \
+                PERK_POS_OFFSET[2], PERK_POS_OFFSET[3]
+            haystack_img = pyautogui.screenshot(region=perk_region)
             for perk in PERKS:
-                pos = find_img(perk.img, confidence=.7, region=PERK_POS)
-                if pos is not None:
-                    print(perk.desc)
-                if pos is not None and (perk_to_select is None or perk.priority < perk_to_select[0].priority):
-                    perk_to_select = (perk, pos)
-
-            if perk_to_select is None:
+                if current_state == State.PLAYING:
+                    perk_img_file = ASSETS_DIR + PERKS_DIR + perk.img + ASSETS_FILE_TYPE
+                    perk_pos = find_img_in_img(haystack_img, perk_img_file, confidence=0.7, grayscale=True)
+                    if perk_pos is not None:
+                        perks_identified += 1
+                        if perks_identified >= MAX_PERK_OPTIONS:
+                            break
+                    if perk_pos is not None and (perk_to_select is None or perk.priority < perk_to_select[0].priority) and not (perk.img == "perk_tradeoff_coins_health" and current_wave > 3000):
+                        perk_to_select = (perk, perk_pos)
+                else:
+                    return
+            if perks_identified < MAX_PERK_OPTIONS:
+                print("Missing Perk")
+                haystack_img.save(PROJECT_DIR + "missingPerk.png")
+            if perk_to_select is None or perk_to_select[0].priority == NEVER_PRIORITY:
                 stop_picking_perks = True
                 more_perks_to_select = False
             else:
-                click(perk_to_select[1], screen_offset=True)
-                sleep(.5)
-                pos = find_img(CHOOSE_ANOTHER_PERK)
-                if pos is None:
+                perk_offset = PERK_POS_OFFSET[0] + perk_to_select[1][0], PERK_POS_OFFSET[1] + perk_to_select[1][1]
+                click(perk_offset)
+                choose_a_perk_pos = find_img(CHOOSE_A_NEW_PERK, confidence=0.7)
+                if choose_a_perk_pos is None:
                     more_perks_to_select = False
-        pos = find_img(PERK_EXIT_BUTTON)
-        if pos is not None:
-            click(pos, screen_offset=True)
-            sleep(.5)
+        exit_pos = find_img(EXIT_BUTTON, confidence=0.8)
+        if exit_pos is not None:
+            click(exit_pos, screen_offset=True, wait=0.5)
+        else:
+            # failsafe for if the exit button can't be found
+            click(POINT_OFF_PERKS_SCREEN_OFFSET, clicks=2)
 
 
 def find_window(name):
@@ -300,14 +454,42 @@ def verify_window(name="The Tower", required_dims=(591, 816)):
         exit()
 
 
+def read_wave_counter():
+    global current_wave, wave_last_check_time
+    try:
+        wave_last_check_time = time()
+        wave_counter_offset = GAME_SCREEN_REGION[0] + WAVE_COUNTER_REGION[0], GAME_SCREEN_REGION[1] + WAVE_COUNTER_REGION[1]
+        wave_counter_region = wave_counter_offset[0], wave_counter_offset[1], WAVE_COUNTER_REGION[2], WAVE_COUNTER_REGION[3]
+        wave_img = pyautogui.screenshot(region=wave_counter_region)
+        wave = pytesseract.image_to_string(wave_img, config="--psm 7")
+        current_wave = int(wave.strip())
+    except Exception:
+        pass
+
+
+def play_round():
+    if current_wave < 600:  # upgrade EALS until it gets too expensive
+        set_tab(Tab.UTILITY)
+        set_menu_position(MenuPosition.BOTTOM)
+        click(UPGRADE_4_OFFSET)
+    elif current_wave < 800:  # upgrade Recovery amount so free upgrades can be focused on EALS as soon as possible
+        set_tab(Tab.UTILITY)
+        set_menu_position(MenuPosition.BOTTOM)
+        click(UPGRADE_1_OFFSET)
+    else:
+        set_tab(Tab.DEFENSE)
+        set_menu_position(MenuPosition.TOP)
+        click(UPGRADE_1_OFFSET)
+
+
 def play():
-    global current_state
+    global current_state, current_tab
     listener = mainKeyboard.Listener(
         on_press=on_press,
         on_release=on_release)
     listener.start()
     verify_window()
-    current_state = State.PAUSED
+    read_wave_counter()
     print("Pausing game!")
 
     while current_state is not State.QUITTING:
@@ -316,21 +498,19 @@ def play():
             # sleep(1)
 
             t = time()
-            # if t - round_time > restart_int:
-            #     check_game_over()
-            if t - gem_2_last_check_time > gem_2_int:
+            if t - game_over_last_check_time > game_over_int and current_state == State.PLAYING:
+                check_game_over()
+            if t - wave_last_check_time > wave_int and current_state == State.PLAYING:
+                read_wave_counter()
+            if t - gem_2_last_check_time > gem_2_int and current_state == State.PLAYING:
                 check_gem_2()
-            if t - gem_5_last_check_time > gem_5_int:
+            if t - gem_5_last_check_time > gem_5_int and current_state == State.PLAYING:
                 check_gem_5()
-            # if not stop_picking_perks:
-            #     check_perk()
+            if t - perk_last_check_time > perk_int and not stop_picking_perks and current_state == State.PLAYING:
+                check_perk()
             play_round()
 
 
 play()
 
-# This is to resize an image 2x to convert from screenshots taken on monitor to laptop resolution
-# img = cv2.imread(ASSETS_PREFIX + "img_file_name" + ASSETS_FILE_TYPE)
-# img_resized = cv2.resize(img, (0, 0), fx=2.0, fy=2.0)
-# cv2.imwrite(ASSETS_PREFIX + "output_file_name" + ASSETS_FILE_TYPE, img_resized)
-
+# convert_assets_to_laptop()
