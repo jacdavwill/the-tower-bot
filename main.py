@@ -97,9 +97,7 @@ wave_int = 60
 # Assets
 USING_EXTERNAL_MONITOR = Quartz.CGMainDisplayID() != 1
 PROJECT_DIR = "/Users/jacobwilliams/dev/the-tower-bot/"
-ASSETS_SCREEN_DIR = "monitor/" if USING_EXTERNAL_MONITOR else "laptop/"
-ASSETS_BASE_DIR = PROJECT_DIR + "assets/"
-ASSETS_DIR = ASSETS_BASE_DIR + ASSETS_SCREEN_DIR
+ASSETS_DIR = PROJECT_DIR + "assets/"
 ASSETS_FILE_TYPE = ".png"
 PERKS_DIR = "perks/"
 STATS_DIR = "stats-history/"
@@ -127,7 +125,7 @@ CHOOSE_A_NEW_PERK = "choose_a_new_perk"
 NEVER_PRIORITY = 1000
 PERKS = [
     Perk(1, "perk_common_pwr", "perk wave requirement -x%"),
-    Perk(2, "perk_tradeoff_coins_health", "x coins, but tower max health -70.0%"),
+    Perk(NEVER_PRIORITY, "perk_tradeoff_coins_health", "x coins, but tower max health -70.0%"),
     Perk(3, "perk_uw_golden_tower", "golden tower bonus x1.5"),
     Perk(4, "perk_common_coins", "x all coin bonuses"),
     Perk(5, "perk_common_game_speed", "increase max game speed by +x"),
@@ -135,20 +133,20 @@ PERKS = [
     Perk(7, "perk_common_defence", "defense percent +x%"),
     Perk(8, "perk_common_health", "x max health"),
     Perk(9, "perk_common_free_upgrades", "free upgrade chance for all +x%"),
-    Perk(10, "perk_common_cash", "x cash bonus"),
-    Perk(11, "perk_common_damage", "x damage"),
-    Perk(12, "perk_uw_black_hole", "black hole duration +x"),
-    Perk(13, "perk_common_orbs", "orbs +1"),
-    Perk(14, "perk_uw_death_wave", "+1 wave on death wave"),
+    Perk(10, "perk_uw_death_wave", "+1 wave on death wave"),
+    Perk(11, "perk_common_cash", "x cash bonus"),
+    Perk(12, "perk_common_damage", "x damage"),
+    Perk(13, "perk_uw_black_hole", "black hole duration +x"),
+    Perk(14, "perk_common_orbs", "orbs +1"),
     Perk(15, "perk_uw_chain_lightning", "chain lightning damage x2"),
-    Perk(6, "perk_common_random_uw", "unlock a random ultimate weapon"),
+    Perk(16, "perk_common_random_uw", "unlock a random ultimate weapon"),
     Perk(17, "perk_common_bounce_shot", "bounce shot +2"),
-    Perk(18, "perk_tradeoff_damage_boss_health", "x tower damage, but bosses have x8 health"),
     Perk(20, "perk_uw_spotlight", "spotlight damage bonus x"),
     Perk(20, "perk_uw_smart_missiles", "4 more smart missiles"),
     Perk(20, "perk_uw_poison_swamp", "swamp radius x1.5"),
     Perk(20, "perk_uw_inner_land_mines", "extra set of inner mines"),
     Perk(20, "perk_uw_chrono_field", "chrono field duration +x"),
+    Perk(100, "perk_tradeoff_damage_boss_health", "x tower damage, but bosses have x8 health"),
     Perk(100, "perk_common_defense_absolute", "x defense absolute"),
     Perk(100, "perk_common_interest", "interest x"),
     Perk(100, "perk_common_land_mine", "land mine damage x"),
@@ -158,7 +156,7 @@ PERKS = [
     Perk(NEVER_PRIORITY, "perk_tradeoff_lifesteal_knockback", "lifesteal x2.50, but knockback force -70%"),
     Perk(NEVER_PRIORITY, "perk_tradeoff_ranged", "ranged enemies attach distance reduced, but ranged enemies damage x3"),
     Perk(NEVER_PRIORITY, "perk_tradeoff_speed_damage", "enemies speed -40%, but enemies damage x2.5"),
-    # Perk(NEVER_PRIORITY, "perk_tradeoff_7", "x12.00 cash per wave, but enemy kill doesn't give cash"),
+    # Perk(NEVER_PRIORITY, "perk_tradeoff_7", "x12.00 cash per wave, but enemy kill doesn't give cash"), I don't have a pic of this perk because it is always banned
     Perk(NEVER_PRIORITY, "perk_tradeoff_tower_regen_health", "tower health regen x8.00, but tower max health -60%"),
     Perk(NEVER_PRIORITY, "perk_tradeoff_enemy_health_tower_lifesteal", "enemies have -x% health, but tower health regen and lifesteal -90%"),
 ]
@@ -190,26 +188,6 @@ def on_release(key):
         change_state(State.QUITTING)
 
 
-def convert_assets_to_laptop():
-    image_scale = 2
-    num_assets_created = 0
-    laptop_assets_dir = PROJECT_DIR + "assets/laptop/"
-    # find existing assets so we don't overwrite
-    assets = []
-    for file in os.listdir(laptop_assets_dir):
-        if file.endswith(ASSETS_FILE_TYPE):
-            assets.append(file)
-
-    # create new assets
-    for file in os.listdir(ASSETS_DIR):
-        if file.endswith(ASSETS_FILE_TYPE) and file not in assets:
-            img = cv2.imread(ASSETS_DIR + file)
-            img_resized = cv2.resize(img, (0, 0), fx=image_scale, fy=image_scale)
-            cv2.imwrite(laptop_assets_dir + file, img_resized)
-            num_assets_created += 1
-    print(str(num_assets_created) + " assets updated")
-
-
 def change_state(new_state):
     global current_state, past_state
     past_state = current_state
@@ -228,7 +206,7 @@ def click(pos, clicks=1, wait=0.25, wait_after_reposition=0.25, screen_offset=Fa
 
 
 def find_img(img_file_name, confidence=None, region=None, game_screen_offset=None, grayscale=False):
-    img_path = ASSETS_BASE_DIR + img_file_name + ASSETS_FILE_TYPE
+    img_path = ASSETS_DIR + img_file_name + ASSETS_FILE_TYPE
     needle_img = cv2.imread(img_path)
     pos_offset = 0, 0
     if region is None:
@@ -307,38 +285,39 @@ def check_game_over():
 def swipe_menu(direction=Direction.UP, times=3):
     sleep(0.5)
     for i in range(times):
-        if direction is Direction.UP:
-            mouse.position = GAME_SCREEN_REGION[0] + BOTTOM_MENU_SWIPE_OFFSET[0], GAME_SCREEN_REGION[1] + \
-                             BOTTOM_MENU_SWIPE_OFFSET[1]
-            swipe_direction = -200
-        else:
-            mouse.position = GAME_SCREEN_REGION[0] + TOP_MENU_SWIPE_OFFSET[0], GAME_SCREEN_REGION[1] + \
-                             TOP_MENU_SWIPE_OFFSET[1]
-            swipe_direction = 200
-        pyautogui.drag(0, swipe_direction, 0.2, button='left')
+        if current_state is State.PLAYING:
+            if direction is Direction.UP:
+                mouse.position = GAME_SCREEN_REGION[0] + BOTTOM_MENU_SWIPE_OFFSET[0], GAME_SCREEN_REGION[1] + \
+                                 BOTTOM_MENU_SWIPE_OFFSET[1]
+                swipe_direction = -200
+            else:
+                mouse.position = GAME_SCREEN_REGION[0] + TOP_MENU_SWIPE_OFFSET[0], GAME_SCREEN_REGION[1] + \
+                                 TOP_MENU_SWIPE_OFFSET[1]
+                swipe_direction = 200
+            pyautogui.drag(0, swipe_direction, 0.2, button='left')
     sleep(0.5)
 
 
 def set_tab(tab):
     global current_tab
     if current_tab is not tab:
-        if current_tab is Tab.UNKNOWN:
+        if current_tab is Tab.UNKNOWN and current_state is State.PLAYING:
             click(UW_TAB_OFFSET)
 
-        if tab is Tab.ATTACK:
+        if tab is Tab.ATTACK and current_state is State.PLAYING:
             click(ATTACK_TAB_OFFSET)
             current_tab = Tab.ATTACK
-        elif tab is Tab.DEFENSE:
+        elif tab is Tab.DEFENSE and current_state is State.PLAYING:
             click(DEFENSE_TAB_OFFSET)
             current_tab = Tab.DEFENSE
-        elif tab is Tab.UTILITY:
+        elif tab is Tab.UTILITY and current_state is State.PLAYING:
             click(UTILITY_TAB_OFFSET)
             current_tab = Tab.UTILITY
 
 
 def set_menu_position(menu_position):
     global attack_tab_menu_position, defense_tab_menu_position, utility_tab_menu_position, current_tab
-    if current_tab is Tab.UNKNOWN:
+    if current_tab is Tab.UNKNOWN and current_state is State.PLAYING:
         set_tab(Tab.DEFENSE)
 
     if current_tab is Tab.ATTACK:
@@ -392,6 +371,7 @@ def check_perk():
     if new_perk_pos is not None:
         sleep(1)
         click(new_perk_pos, screen_offset=True)
+        # print("Perk Choices:")
         more_perks_to_select = True
         while more_perks_to_select:
             perk_to_select = None  # (perk, pos)
@@ -402,23 +382,27 @@ def check_perk():
             for perk in PERKS:
                 if current_state == State.PLAYING:
                     perk_img_file = ASSETS_DIR + PERKS_DIR + perk.img + ASSETS_FILE_TYPE
-                    perk_pos = find_img_in_img(haystack_img, perk_img_file, confidence=0.7, grayscale=True)
+                    perk_pos = find_img_in_img(haystack_img, perk_img_file, confidence=0.9, grayscale=True)
                     if perk_pos is not None:
                         perks_identified += 1
+                        # print(f"\t{perk.desc}")
                         if perks_identified >= MAX_PERK_OPTIONS:
                             break
                     if perk_pos is not None and (perk_to_select is None or perk.priority < perk_to_select[0].priority) and not (perk.img == "perk_tradeoff_coins_health" and current_wave > 3000):
                         perk_to_select = (perk, perk_pos)
                 else:
                     return
-            if perks_identified < MAX_PERK_OPTIONS:
+            if perks_identified is not MAX_PERK_OPTIONS:
                 print("Missing Perk")
                 haystack_img.save(PROJECT_DIR + "missingPerk.png")
             if perk_to_select is None or perk_to_select[0].priority == NEVER_PRIORITY:
                 stop_picking_perks = True
                 more_perks_to_select = False
+                print("Stopping perk selection\n\n")
             else:
+                print(f"Chose: {perk_to_select[0].desc}")
                 perk_offset = PERK_POS_OFFSET[0] + perk_to_select[1][0], PERK_POS_OFFSET[1] + perk_to_select[1][1]
+                mouse.position = GAME_SCREEN_REGION[0] + perk_offset[0], GAME_SCREEN_REGION[1] + perk_offset[1]
                 click(perk_offset)
                 choose_a_perk_pos = find_img(CHOOSE_A_NEW_PERK, confidence=0.7)
                 if choose_a_perk_pos is None:
@@ -471,15 +455,18 @@ def play_round():
     if current_wave < 600:  # upgrade EALS until it gets too expensive
         set_tab(Tab.UTILITY)
         set_menu_position(MenuPosition.BOTTOM)
-        click(UPGRADE_4_OFFSET)
+        if current_state is State.PLAYING:
+            click(UPGRADE_4_OFFSET)
     elif current_wave < 800:  # upgrade Recovery amount so free upgrades can be focused on EALS as soon as possible
         set_tab(Tab.UTILITY)
         set_menu_position(MenuPosition.BOTTOM)
-        click(UPGRADE_1_OFFSET)
+        if current_state is State.PLAYING:
+            click(UPGRADE_1_OFFSET)
     else:
         set_tab(Tab.DEFENSE)
         set_menu_position(MenuPosition.TOP)
-        click(UPGRADE_1_OFFSET)
+        if current_state is State.PLAYING:
+            click(UPGRADE_1_OFFSET)
 
 
 def play():
@@ -508,7 +495,8 @@ def play():
                 check_gem_5()
             if t - perk_last_check_time > perk_int and not stop_picking_perks and current_state == State.PLAYING:
                 check_perk()
-            play_round()
+            if current_state is State.PLAYING:
+                play_round()
 
 
 play()
