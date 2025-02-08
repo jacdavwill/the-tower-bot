@@ -78,6 +78,7 @@ MORE_STATS_BUTTON = "more_stats_button"
 
 # Upgrades
 UPGRADE_1_OFFSET = (239, 562)
+UPGRADE_2_OFFSET = (450, 562)
 UPGRADE_4_OFFSET = (450, 667)
 
 # Times
@@ -124,40 +125,53 @@ NEW_PERK_BUTTON = "new_perk_button"
 CHOOSE_A_NEW_PERK = "choose_a_new_perk"
 NEVER_PRIORITY = 1000
 PERKS = [
+    # We want PWR and econ perks first
     Perk(1, "perk_common_pwr", "perk wave requirement -x%"),
-    Perk(NEVER_PRIORITY, "perk_tradeoff_coins_health", "x coins, but tower max health -70.0%"),
+    Perk(2, "perk_tradeoff_coins_health", "x coins, but tower max health -70.0%"),
     Perk(3, "perk_uw_golden_tower", "golden tower bonus x1.5"),
-    Perk(4, "perk_common_coins", "x all coin bonuses"),
-    Perk(5, "perk_common_game_speed", "increase max game speed by +x"),
-    Perk(6, "perk_tradeoff_damage_damage", "enemies damage -50%, but tower damage -50%"),
-    Perk(7, "perk_common_defence", "defense percent +x%"),
-    Perk(8, "perk_common_health", "x max health"),
-    Perk(9, "perk_common_free_upgrades", "free upgrade chance for all +x%"),
-    Perk(10, "perk_uw_death_wave", "+1 wave on death wave"),
-    Perk(11, "perk_common_cash", "x cash bonus"),
-    Perk(12, "perk_common_damage", "x damage"),
-    Perk(13, "perk_uw_black_hole", "black hole duration +x"),
+    Perk(4, "perk_uw_black_hole", "black hole duration +12s"),
+    Perk(5, "perk_common_coins", "x all coin bonuses"),
+    Perk(6, "perk_common_game_speed", "increase max game speed by +x"),
+
+    # Then we want perks that will drastically increase run length
+    Perk(7, "perk_tradeoff_damage_damage", "enemies damage -50%, but tower damage -50%"),
+    Perk(8, "perk_common_defence", "defense percent +x%"),
+    Perk(9, "perk_common_health", "x max health"),
+    Perk(10, "perk_common_free_upgrades", "free upgrade chance for all +x%"),
+
+    # We want to get these out of the way to make it easier to get the coin tradeoff perk and avoid a perk dead-end
+    Perk(11, "perk_tradeoff_damage_boss_health", "x tower damage, but bosses have x8 health"),
+    Perk(11, "perk_tradeoff_health_speed", "boss health -70.0%, but boss speed +50%"),
+    Perk(11, "perk_tradeoff_tower_regen_health", "tower health regen x8.00, but tower max health -60%"),
+
+    # These are helpful perks
+    Perk(12, "perk_uw_death_wave", "+1 wave on death wave"),
+    Perk(13, "perk_common_cash", "x cash bonus"),
     Perk(14, "perk_common_orbs", "orbs +1"),
-    Perk(15, "perk_uw_chain_lightning", "chain lightning damage x2"),
-    Perk(16, "perk_common_random_uw", "unlock a random ultimate weapon"),
-    Perk(17, "perk_common_bounce_shot", "bounce shot +2"),
-    Perk(20, "perk_uw_spotlight", "spotlight damage bonus x"),
+
+    # These we want to get out of the way because they are singles
+    Perk(20, "perk_uw_chain_lightning", "chain lightning damage x2"),
     Perk(20, "perk_uw_smart_missiles", "4 more smart missiles"),
-    Perk(20, "perk_uw_poison_swamp", "swamp radius x1.5"),
+    Perk(20, "perk_uw_spotlight", "spotlight damage bonus x1.5"),
     Perk(20, "perk_uw_inner_land_mines", "extra set of inner mines"),
-    Perk(20, "perk_uw_chrono_field", "chrono field duration +x"),
-    Perk(100, "perk_tradeoff_damage_boss_health", "x tower damage, but bosses have x8 health"),
+    Perk(20, "perk_uw_chrono_field", "chrono field duration +5s"),
+    Perk(20, "perk_uw_poison_swamp", "swamp radius x1.5"),
+    Perk(20, "perk_common_random_uw", "unlock a random ultimate weapon"),
+
+    # This is good, but not needed until deep into the run
+    Perk(30, "perk_common_health_regen", "x health regen"),
+
+    # These are basically neutral
+    Perk(99, "perk_common_damage", "x damage"),
+    Perk(99, "perk_common_land_mine", "land mine damage x"),
+    Perk(99, "perk_common_bounce_shot", "bounce shot +2"),
     Perk(100, "perk_common_defense_absolute", "x defense absolute"),
     Perk(100, "perk_common_interest", "interest x"),
-    Perk(100, "perk_common_land_mine", "land mine damage x"),
-    Perk(100, "perk_tradeoff_health_speed", "boss health -70.0%, but boss speed +50%"),
-    Perk(100, "perk_common_health_regen", "x health regen"),
 
     Perk(NEVER_PRIORITY, "perk_tradeoff_lifesteal_knockback", "lifesteal x2.50, but knockback force -70%"),
-    Perk(NEVER_PRIORITY, "perk_tradeoff_ranged", "ranged enemies attach distance reduced, but ranged enemies damage x3"),
+    Perk(NEVER_PRIORITY, "perk_tradeoff_ranged", "ranged enemies attack distance reduced, but ranged enemies damage x3"),
     Perk(NEVER_PRIORITY, "perk_tradeoff_speed_damage", "enemies speed -40%, but enemies damage x2.5"),
-    # Perk(NEVER_PRIORITY, "perk_tradeoff_7", "x12.00 cash per wave, but enemy kill doesn't give cash"), I don't have a pic of this perk because it is always banned
-    Perk(NEVER_PRIORITY, "perk_tradeoff_tower_regen_health", "tower health regen x8.00, but tower max health -60%"),
+    Perk(NEVER_PRIORITY, "perk_tradeoff_cash_round", "x12.00 cash per wave, but enemy kill doesn't give cash"),
     Perk(NEVER_PRIORITY, "perk_tradeoff_enemy_health_tower_lifesteal", "enemies have -x% health, but tower health regen and lifesteal -90%"),
 ]
 
@@ -388,7 +402,7 @@ def check_perk():
                         # print(f"\t{perk.desc}")
                         if perks_identified >= MAX_PERK_OPTIONS:
                             break
-                    if perk_pos is not None and (perk_to_select is None or perk.priority < perk_to_select[0].priority) and not (perk.img == "perk_tradeoff_coins_health" and current_wave > 3000):
+                    if perk_pos is not None and (perk_to_select is None or perk.priority < perk_to_select[0].priority) and not (perk.img == "perk_tradeoff_coins_health" and current_wave > 4000):
                         perk_to_select = (perk, perk_pos)
                 else:
                     return
@@ -452,21 +466,31 @@ def read_wave_counter():
 
 
 def play_round():
-    if current_wave < 600:  # upgrade EALS until it gets too expensive
+    if current_wave < 450:  # upgrade EALS until it gets too expensive
         set_tab(Tab.UTILITY)
         set_menu_position(MenuPosition.BOTTOM)
         if current_state is State.PLAYING:
             click(UPGRADE_4_OFFSET)
-    elif current_wave < 800:  # upgrade Recovery amount so free upgrades can be focused on EALS as soon as possible
+    elif current_wave < 500:  # upgrade Recovery Amount so free upgrades can be focused on EALS as soon as possible
         set_tab(Tab.UTILITY)
         set_menu_position(MenuPosition.BOTTOM)
         if current_state is State.PLAYING:
             click(UPGRADE_1_OFFSET)
-    else:
+    elif current_wave < 750:  # upgrade Max Recovery so free upgrades can be focused on EALS as soon as possible
+        set_tab(Tab.UTILITY)
+        set_menu_position(MenuPosition.BOTTOM)
+        if current_state is State.PLAYING:
+            click(UPGRADE_2_OFFSET)
+    elif current_wave < 900:  # upgrade health until max
         set_tab(Tab.DEFENSE)
         set_menu_position(MenuPosition.TOP)
         if current_state is State.PLAYING:
             click(UPGRADE_1_OFFSET)
+    else:  # upgrade health regen
+        set_tab(Tab.DEFENSE)
+        set_menu_position(MenuPosition.TOP)
+        if current_state is State.PLAYING:
+            click(UPGRADE_2_OFFSET)
 
 
 def play():
@@ -500,5 +524,3 @@ def play():
 
 
 play()
-
-# convert_assets_to_laptop()
